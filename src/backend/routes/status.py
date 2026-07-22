@@ -1,5 +1,6 @@
 """GET /status — Health check and model state."""
 
+from importlib.metadata import version as get_version
 from fastapi import APIRouter
 from backend.services.model_service import is_model_loaded, get_current_model_name
 
@@ -12,5 +13,5 @@ async def get_status():
         "status": "ok",
         "model_loaded": is_model_loaded(),
         "current_model": get_current_model_name(),
-        "version": "0.1.0",
+        "version": get_version("local-ai-runtime"),
     }
