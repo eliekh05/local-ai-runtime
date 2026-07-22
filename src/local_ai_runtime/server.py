@@ -8,13 +8,16 @@ from pathlib import Path
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
-from fastapi.responses import RedirectResponse, FileResponse
-from fastapi.staticfiles import StaticFiles
+from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.middleware.cors import CORSMiddleware
 
 logger = logging.getLogger("local-ai-runtime")
 
-STATIC_DIR = Path(__file__).parent / "static"
+# Load frontend HTML at import time
+_INDEX_HTML = ""
+_static_path = Path(__file__).parent / "static" / "index.html"
+if _static_path.exists():
+    _INDEX_HTML = _static_path.read_text()
 
 
 def create_app(server_config: dict) -> FastAPI:
@@ -64,12 +67,11 @@ def create_app(server_config: dict) -> FastAPI:
     app.include_router(conversations_router, prefix=f"{prefix}/conversations", tags=["conversations"])
     app.include_router(metrics_router, prefix=f"{prefix}/metrics", tags=["metrics"])
 
-    # Serve frontend at /
-    index = STATIC_DIR / "index.html"
-    if index.exists():
+    # Serve frontend
+    if _INDEX_HTML:
         @app.get("/", include_in_schema=False)
         async def root():
-            return FileResponse(str(index))
+            return HTMLResponse(content=_INDEX_HTML)
     else:
         @app.get("/", include_in_schema=False)
         async def root():
