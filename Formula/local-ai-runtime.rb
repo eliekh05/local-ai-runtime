@@ -7,8 +7,8 @@
 class LocalAiRuntime < Formula
   desc "BYOK hybrid local AI chat runtime — run any model from anywhere"
   homepage "https://github.com/youruser/local-ai-runtime"
-  url "https://github.com/youruser/local-ai-runtime/archive/refs/tags/v0.1.0.tar.gz"
-  sha256 "REPLACE_WITH_ACTUAL_SHA256"
+  url "https://github.com/youruser/local-ai-runtime/archive/refs/tags/v0.1.1.tar.gz"
+  sha256 "4b03a4d73c573339cc622739b1d21a3b147d1c56e9b1558194ddb06c7dcce31c"
   license "MIT"
 
   depends_on "uv"
