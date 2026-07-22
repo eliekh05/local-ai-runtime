@@ -2,7 +2,7 @@
 name = "local-ai-runtime"
 version = "0.1.0"
 description = "Local AI chat runtime — BYOK hybrid inference (local GGUF, ollama, vLLM, OpenAI, Anthropic, Gemini, any OpenAI-compatible)"
-requires-python = ">=3.11"
+requires-python = ">=3.14"
 dependencies = [
     "fastapi>=0.100.0",
     "uvicorn>=0.20.0",
@@ -29,8 +29,8 @@ all = [
 [project.scripts]
 local-ai-runtime = "local_ai_runtime.cli:main"
 
-[tool.uv]
-dev-dependencies = [
+[dependency-groups]
+dev = [
     "ruff>=0.1.0",
     "pytest>=7.0.0",
 ]
