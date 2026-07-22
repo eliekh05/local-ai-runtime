@@ -7,7 +7,7 @@ local_ai_runtime = ["static/*"]
 
 [project]
 name = "local-ai-runtime"
-version = "0.1.28"
+version = "0.1.29"
 description = "BYOK hybrid local AI runtime — 10+ backends, onboarding, OpenAI-compatible /v1 gateway"
 requires-python = ">=3.11"
 dependencies = [
