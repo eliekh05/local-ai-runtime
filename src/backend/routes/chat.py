@@ -1,18 +1,11 @@
 """POST /chat and POST /chat/stream — Chat endpoints with streaming."""
 
-import sys
-from pathlib import Path
-
-_project_root = str(Path(__file__).resolve().parent.parent.parent)
-if _project_root not in sys.path:
-    sys.path.insert(0, _project_root)
-
 import json
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
-from controllers.chat_controller import handle_chat_request
+from backend.controllers.chat_controller import handle_chat_request
 
 router = APIRouter()
 
@@ -43,9 +36,9 @@ async def chat_stream(request: ChatRequest):
     if not request.message.strip():
         raise HTTPException(status_code=400, detail="Message cannot be empty.")
 
-    from models.chat_message import ChatMessage, Role
-    from services.inference_service import generate_stream_response
-    from services.conversation_service import (
+    from backend.models.chat_message import ChatMessage, Role
+    from backend.services.inference_service import generate_stream_response
+    from backend.services.conversation_service import (
         get_conversation,
         add_message_to_conversation,
     )

@@ -1,7 +1,7 @@
-"""GET /metrics -- Performance monitoring endpoint."""
+"""GET /metrics — Performance monitoring endpoint."""
 
 from fastapi import APIRouter
-from services.metrics_service import get_metrics
+from backend.services.metrics_service import get_metrics
 
 router = APIRouter()
 

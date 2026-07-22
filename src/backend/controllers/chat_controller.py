@@ -2,9 +2,9 @@
 
 from fastapi import HTTPException
 
-from services.inference_service import generate_response, InferenceError
-from models.chat_message import ChatMessage, Role
-from services.conversation_service import get_conversation
+from backend.services.inference_service import generate_response, InferenceError
+from backend.models.chat_message import ChatMessage, Role
+from backend.services.conversation_service import get_conversation
 
 
 async def handle_chat_request(request) -> dict:
@@ -30,7 +30,7 @@ async def handle_chat_request(request) -> dict:
 
     # Auto-save user message and assistant response to conversation
     if request.conversation_id:
-        from services.conversation_service import add_message_to_conversation
+        from backend.services.conversation_service import add_message_to_conversation
         add_message_to_conversation(request.conversation_id, "user", request.message)
         add_message_to_conversation(request.conversation_id, "assistant", result.content)
 

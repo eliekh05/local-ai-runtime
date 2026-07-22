@@ -5,12 +5,12 @@ Service layer for model file management — config-driven, no hardcoded values.
 import json
 from pathlib import Path
 
-from models.model_config import ModelConfig
+from backend.models.model_config import ModelConfig
 
 # Config lives in ~/.config/local-ai-runtime/
 _USER_CONFIG_DIR = Path.home() / ".config" / "local-ai-runtime"
 _MODEL_CONFIG_PATH = _USER_CONFIG_DIR / "model.config.json"
-_MODELS_DIR = None  # Loaded from config at runtime
+_MODELS_DIR = None
 
 
 def _ensure_config():
@@ -18,7 +18,6 @@ def _ensure_config():
 
 
 def _get_models_dir() -> Path:
-    """Get models directory from config."""
     global _MODELS_DIR
     if _MODELS_DIR is not None:
         return _MODELS_DIR
@@ -72,11 +71,7 @@ def scan_model_directory() -> list:
     if not models_dir.exists():
         return []
     return [
-        {
-            "filename": f.name,
-            "size_bytes": f.stat().st_size,
-            "path": str(f),
-        }
+        {"filename": f.name, "size_bytes": f.stat().st_size, "path": str(f)}
         for f in sorted(models_dir.glob("*.gguf"))
     ]
 

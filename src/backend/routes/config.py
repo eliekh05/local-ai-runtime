@@ -1,17 +1,10 @@
 """GET /config and PUT /config — Read/update active model configuration."""
 
-import sys
-from pathlib import Path
-
-_project_root = str(Path(__file__).resolve().parent.parent.parent)
-if _project_root not in sys.path:
-    sys.path.insert(0, _project_root)
-
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
-from models.model_config import ModelConfig, GenerationParams
-from services.model_service import get_active_config, set_active_config, scan_model_directory
+from backend.models.model_config import ModelConfig, GenerationParams
+from backend.services.model_service import get_active_config, set_active_config, scan_model_directory
 
 router = APIRouter()
 
@@ -40,7 +33,6 @@ async def get_config():
 async def update_config(update: ConfigUpdate):
     config = get_active_config()
     if config is None:
-        # Create new config from defaults
         config = ModelConfig(model_file="")
 
     if update.backend_type is not None:
@@ -70,6 +62,5 @@ async def update_config(update: ConfigUpdate):
 
 @router.get("/backends")
 async def list_backends():
-    """List all available BYOK backends and their status."""
-    from model_runtime.backends import list_backends
-    return {"backends": list_backends()}
+    from model_runtime.backends import list_backends as _list
+    return {"backends": _list()}

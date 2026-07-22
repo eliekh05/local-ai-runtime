@@ -8,6 +8,7 @@ from pathlib import Path
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
+from fastapi.responses import RedirectResponse
 from fastapi.middleware.cors import CORSMiddleware
 
 
@@ -49,13 +50,17 @@ def create_app(server_config: dict) -> FastAPI:
             allow_headers=["*"],
         )
 
+    @app.get("/")
+    async def root():
+        return RedirectResponse(url="/docs")
+
     # Routes
-    from routes.status import router as status_router
-    from routes.models import router as models_router
-    from routes.config import router as config_router
-    from routes.chat import router as chat_router
-    from routes.conversations import router as conversations_router
-    from routes.metrics import router as metrics_router
+    from backend.routes.status import router as status_router
+    from backend.routes.models import router as models_router
+    from backend.routes.config import router as config_router
+    from backend.routes.chat import router as chat_router
+    from backend.routes.conversations import router as conversations_router
+    from backend.routes.metrics import router as metrics_router
 
     api_prefix = server_config.get("api_prefix", "")
     app.include_router(status_router, prefix=f"{api_prefix}/status", tags=["status"])

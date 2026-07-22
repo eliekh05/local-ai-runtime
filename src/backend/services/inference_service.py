@@ -3,19 +3,12 @@ Service layer between controllers and the BYOK backend system.
 Routes requests to the correct backend based on config.
 """
 
-import sys
-from pathlib import Path
 from typing import Generator
-
-# Ensure project root is on sys.path
-_project_root = str(Path(__file__).resolve().parent.parent.parent)
-if _project_root not in sys.path:
-    sys.path.insert(0, _project_root)
 
 from model_runtime.backends import get_backend, BackendError
 from model_runtime.chat_template_auto import auto_detect_template
-from models.chat_message import ChatMessage, Role
-from services.model_service import get_active_config
+from backend.models.chat_message import ChatMessage, Role
+from backend.services.model_service import get_active_config
 
 
 class InferenceError(Exception):
@@ -35,21 +28,14 @@ class InferenceResult:
 def _build_messages(message, conversation_history=None, config=None) -> list[dict]:
     """Build OpenAI-format message list from ChatMessage objects."""
     messages = []
-
-    # System prompt from config
     if config and config.get("system_prompt"):
         messages.append({"role": "system", "content": config["system_prompt"]})
-
-    # Conversation history
     if conversation_history:
         for msg in conversation_history:
             role = msg.role.value if hasattr(msg.role, "value") else str(msg.role)
             messages.append({"role": role, "content": msg.content})
-
-    # Current user message
     role = message.role.value if hasattr(message.role, "value") else str(message.role)
     messages.append({"role": role, "content": message.content})
-
     return messages
 
 
@@ -60,20 +46,14 @@ def _get_backend_and_config():
         raise InferenceError("No active model configuration. Set one via PUT /config.")
 
     config_dict = config.to_dict() if hasattr(config, "to_dict") else config
-
-    # Determine which backend to use
     backend_type = config_dict.get("backend_type", "llama-cpp")
-
-    # Get API backend config if using an API backend
     api_backends = config_dict.get("api_backends", {})
     backend_config = {}
 
     if backend_type in api_backends:
         backend_config = api_backends[backend_type]
     elif backend_type == "llama-cpp":
-        backend_config = {
-            "models_dir": config_dict.get("models_dir", "./models"),
-        }
+        backend_config = {"models_dir": config_dict.get("models_dir", "./models")}
     elif backend_type == "ollama":
         backend_config = api_backends.get("ollama", {})
     elif backend_type == "vllm":
@@ -91,7 +71,6 @@ async def generate_response(message, conversation_id=None, conversation_history=
     except Exception as e:
         raise InferenceError(f"Failed to load config: {e}")
 
-    # For local backends, pass model_file from config
     if backend_type == "llama-cpp":
         backend_config["model_file"] = config_dict.get("model_file", "")
         backend_config["models_dir"] = config_dict.get("models_dir", "./models")
@@ -106,26 +85,19 @@ async def generate_response(message, conversation_id=None, conversation_history=
         raise InferenceError(str(e))
 
     if not backend.is_available():
-        raise InferenceError(
-            f"Backend '{backend_type}' is not available. "
-            f"Check your configuration and dependencies."
-        )
+        raise InferenceError(f"Backend '{backend_type}' is not available.")
 
-    # Load model if not already loaded
     try:
         backend.load_model(config_dict)
     except BackendError as e:
         raise InferenceError(f"Failed to load model: {e}")
 
-    # Build messages
     messages = _build_messages(message, conversation_history, config_dict)
 
-    # Auto-detect chat template if set to "auto"
     template = config_dict.get("chat_template", "chatml")
     if template == "auto":
         template = auto_detect_template(messages)
 
-    # Add template to params
     gen_params = config_dict.get("generation", {})
     gen_params["chat_template"] = template
 
@@ -147,7 +119,7 @@ def generate_stream_response(message, conversation_history=None) -> Generator[st
     try:
         backend_type, backend_config, config_dict = _get_backend_and_config()
     except InferenceError:
-        yield f"[Error: No config loaded]"
+        yield "[Error: No config loaded]"
         return
 
     if backend_type == "llama-cpp":

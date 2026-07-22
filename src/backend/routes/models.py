@@ -1,14 +1,7 @@
 """GET /models — List available GGUF model files with auto-detected metadata."""
 
-import sys
-from pathlib import Path
-
-_project_root = str(Path(__file__).resolve().parent.parent.parent)
-if _project_root not in sys.path:
-    sys.path.insert(0, _project_root)
-
 from fastapi import APIRouter
-from services.model_service import scan_model_directory
+from backend.services.model_service import scan_model_directory
 
 router = APIRouter()
 
@@ -23,7 +16,7 @@ async def list_models():
 async def detect_models():
     """Auto-detect metadata for all GGUF files in models/ directory."""
     from model_runtime.detector import detect_models_in_directory
-    from services.model_service import _get_models_dir
+    from backend.services.model_service import _get_models_dir
     models_dir = _get_models_dir()
     results = detect_models_in_directory(models_dir)
     return {"models": results}
