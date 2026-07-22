@@ -38,10 +38,13 @@ async def update_config(update: ConfigUpdate):
     if update.backend_type is not None:
         config.backend_type = update.backend_type
     if update.model_file is not None:
-        models = scan_model_directory()
-        filenames = [m["filename"] for m in models]
-        if update.model_file not in filenames:
-            raise HTTPException(status_code=404, detail=f"Model not found: {update.model_file}")
+        # Only validate GGUF file existence for llama-cpp backend
+        bt = update.backend_type or config.backend_type
+        if bt == "llama-cpp":
+            models = scan_model_directory()
+            filenames = [m["filename"] for m in models]
+            if update.model_file and update.model_file not in filenames:
+                raise HTTPException(status_code=404, detail=f"Model not found: {update.model_file}")
         config.model_file = update.model_file
     if update.chat_template is not None:
         config.chat_template = update.chat_template
