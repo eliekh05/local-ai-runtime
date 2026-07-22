@@ -7,10 +7,14 @@ from pathlib import Path
 
 from models.model_config import ModelConfig
 
-# Load paths from config, not hardcoded
-_CONFIG_DIR = Path(__file__).resolve().parent.parent.parent / "config"
-_MODEL_CONFIG_PATH = _CONFIG_DIR / "model.config.json"
+# Config lives in ~/.config/local-ai-runtime/
+_USER_CONFIG_DIR = Path.home() / ".config" / "local-ai-runtime"
+_MODEL_CONFIG_PATH = _USER_CONFIG_DIR / "model.config.json"
 _MODELS_DIR = None  # Loaded from config at runtime
+
+
+def _ensure_config():
+    _USER_CONFIG_DIR.mkdir(parents=True, exist_ok=True)
 
 
 def _get_models_dir() -> Path:
@@ -21,11 +25,12 @@ def _get_models_dir() -> Path:
     if _MODEL_CONFIG_PATH.exists():
         with open(_MODEL_CONFIG_PATH) as f:
             config = json.load(f)
-        # Models dir relative to project root
-        project_root = Path(__file__).resolve().parent.parent.parent
-        _MODELS_DIR = project_root / config.get("models_dir", "./models")
+        models_str = config.get("models_dir", "./models")
+        _MODELS_DIR = Path(models_str)
+        if not _MODELS_DIR.is_absolute():
+            _MODELS_DIR = Path.cwd() / _MODELS_DIR
     else:
-        _MODELS_DIR = Path(__file__).resolve().parent.parent.parent / "models"
+        _MODELS_DIR = Path.cwd() / "models"
     return _MODELS_DIR
 
 
@@ -57,7 +62,7 @@ def get_active_config() -> ModelConfig | None:
 def set_active_config(config: ModelConfig) -> None:
     global _active_config
     _active_config = config
-    _MODEL_CONFIG_PATH.parent.mkdir(parents=True, exist_ok=True)
+    _ensure_config()
     with open(_MODEL_CONFIG_PATH, "w") as f:
         json.dump(config.to_dict(), f, indent=2)
 
