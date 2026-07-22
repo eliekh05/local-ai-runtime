@@ -1,16 +1,20 @@
 """GET /config and PUT /config — Read/update active model configuration."""
 
+import os
+
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
 from backend.models.model_config import ModelConfig
 from backend.services.model_service import get_active_config, set_active_config, scan_model_directory
+from model_runtime.providers import get_provider, list_providers, resolve_provider_config
 
 router = APIRouter()
 
 
 class ConfigUpdate(BaseModel):
     backend_type: str | None = None
+    provider_id: str | None = None
     model_file: str | None = None
     chat_template: str | None = None
     context_length: int | None = None
@@ -43,6 +47,8 @@ async def update_config(update: ConfigUpdate):
     if config is None:
         config = ModelConfig(model_file="")
 
+    if update.provider_id is not None:
+        config.provider_id = update.provider_id
     if update.backend_type is not None:
         config.backend_type = update.backend_type
     if update.model_file is not None:
@@ -123,47 +129,81 @@ async def list_backends():
     return {"backends": _list()}
 
 
+@router.get("/providers")
+async def providers():
+    """Onboarding catalog: 10+ BYOK / local / router providers."""
+    return {"providers": list_providers()}
+
+
 class APIKeySet(BaseModel):
-    backend: str
-    api_key: str
+    backend: str | None = None
+    provider: str | None = None
+    api_key: str = ""
     base_url: str | None = None
     model: str | None = None
 
 
-@router.post("/apikey")
-async def set_api_key(body: APIKeySet):
-    """Store API key in process env for the session (and optional compatible settings)."""
-    import os
+def _apply_resolved(config: ModelConfig, resolved: dict) -> ModelConfig:
+    config.provider_id = resolved["provider_id"]
+    config.backend_type = resolved["backend_type"]
+    config.model_file = resolved.get("model_file") or config.model_file
+    for key in (
+        "openai_model",
+        "anthropic_model",
+        "gemini_model",
+        "ollama_model",
+        "vllm_model",
+        "compatible_model",
+        "compatible_base_url",
+    ):
+        if key in resolved and resolved[key] is not None:
+            setattr(config, key, resolved[key])
+    for name, cfg in (resolved.get("api_backends") or {}).items():
+        config.api_backends[name] = {**config.api_backends.get(name, {}), **cfg}
+    for env_name, value in (resolved.get("env") or {}).items():
+        os.environ[env_name] = value
+    return config
 
-    env_map = {
-        "openai": "OPENAI_API_KEY",
-        "anthropic": "ANTHROPIC_API_KEY",
-        "gemini": "GEMINI_API_KEY",
-    }
-    env_var = env_map.get(body.backend)
-    if env_var:
-        os.environ[env_var] = body.api_key
-        return {"message": f"API key set for {body.backend}"}
+
+@router.post("/apikey")
+@router.post("/apikey/")
+async def set_api_key(body: APIKeySet):
+    """Configure a provider (BYOK) for the session and persist model settings."""
+    provider_id = body.provider or body.backend
+    if not provider_id:
+        raise HTTPException(status_code=400, detail="provider or backend is required")
+
+    # Legacy aliases
+    if provider_id == "openai_compatible":
+        provider_id = "custom"
+
+    if get_provider(provider_id) is None:
+        # Allow raw backend ids that match native engines
+        if provider_id in ("openai", "anthropic", "gemini", "ollama", "vllm", "llama-cpp"):
+            pass
+        else:
+            raise HTTPException(status_code=400, detail=f"Unknown provider: {provider_id}")
+
+    try:
+        resolved = resolve_provider_config(
+            provider_id,
+            api_key=body.api_key or None,
+            base_url=body.base_url,
+            model=body.model,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+
+    provider = get_provider(provider_id)
+    if provider and provider.get("needs_key") and not body.api_key:
+        raise HTTPException(status_code=400, detail=f"API key required for {provider['name']}")
 
     config = get_active_config() or ModelConfig(model_file="")
-    if body.backend == "openai_compatible":
-        config.backend_type = "openai_compatible"
-        if body.base_url:
-            config.compatible_base_url = body.base_url
-            config.api_backends.setdefault("openai_compatible", {})
-            config.api_backends["openai_compatible"]["base_url"] = body.base_url
-            config.api_backends["openai_compatible"]["enabled"] = True
-        if body.model:
-            config.compatible_model = body.model
-            config.model_file = body.model
-            config.api_backends["openai_compatible"]["model"] = body.model
-        if body.api_key:
-            os.environ["OPENAI_COMPATIBLE_API_KEY"] = body.api_key
-            config.api_backends["openai_compatible"]["api_key_env"] = "OPENAI_COMPATIBLE_API_KEY"
-        set_active_config(config)
-        return {"message": "OpenAI-compatible backend configured"}
-    if body.backend == "ollama":
-        return {"message": "Ollama uses local connection, no API key needed"}
-    if body.backend == "vllm":
-        return {"message": "vLLM uses local connection, no API key needed"}
-    raise HTTPException(status_code=400, detail=f"Unknown backend: {body.backend}")
+    config = _apply_resolved(config, resolved)
+    set_active_config(config)
+    return {
+        "message": f"Provider '{provider_id}' configured",
+        "provider_id": provider_id,
+        "backend_type": config.backend_type,
+        "ready": config.is_ready(),
+    }

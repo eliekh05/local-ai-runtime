@@ -29,7 +29,7 @@ def create_app(server_config: dict) -> FastAPI:
         from importlib.metadata import version as pkg_version
         app_version = pkg_version("local-ai-runtime")
     except Exception:
-        app_version = "0.1.25"
+        app_version = "0.1.27"
 
     app = FastAPI(
         title="local-ai-runtime",
@@ -62,6 +62,7 @@ def create_app(server_config: dict) -> FastAPI:
     from backend.routes.chat import router as chat_router
     from backend.routes.conversations import router as conversations_router
     from backend.routes.metrics import router as metrics_router
+    from backend.routes.openai_v1 import router as openai_v1_router
 
     prefix = server_config.get("api_prefix", "")
     app.include_router(status_router, prefix=f"{prefix}/status", tags=["status"])
@@ -70,6 +71,8 @@ def create_app(server_config: dict) -> FastAPI:
     app.include_router(chat_router, prefix=f"{prefix}/chat", tags=["chat"])
     app.include_router(conversations_router, prefix=f"{prefix}/conversations", tags=["conversations"])
     app.include_router(metrics_router, prefix=f"{prefix}/metrics", tags=["metrics"])
+    # OpenAI-compatible gateway for SDKs / other clients (9router-style)
+    app.include_router(openai_v1_router, prefix=f"{prefix}/v1", tags=["openai-v1"])
 
     # Serve frontend
     if index_html:

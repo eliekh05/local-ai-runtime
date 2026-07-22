@@ -35,14 +35,20 @@
 
 ---
 
-## ADR-004: BYOK hybrid — all backends
+## ADR-004: BYOK hybrid — multi-backend catalog
 
 **Status:** Decided  
-**Date:** 2025
+**Date:** 2025 / updated 2026-07
 
-**Decision:** Support 7 backends: llama-cpp, ollama, vLLM, OpenAI, Anthropic, Gemini, OpenAI-compatible.
+**Decision:** Support a provider catalog of 10+ backends via BYOK:
 
-**Rationale:** Users want local privacy AND access to paid/free APIs. One app, any model source.
+- Local: llama-cpp, Ollama, vLLM, LM Studio
+- Native cloud: OpenAI, Anthropic, Gemini
+- OpenAI-compatible presets: OpenRouter, Groq, DeepSeek, Mistral, Together, Fireworks, xAI, 9router, custom `/v1`
+
+Expose an OpenAI-compatible gateway at `/v1/models` and `/v1/chat/completions` so other clients can use the active provider like a router.
+
+**Rationale:** Users want local privacy AND access to paid/free APIs. One app, any model source, one onboarding wizard.
 
 ---
 

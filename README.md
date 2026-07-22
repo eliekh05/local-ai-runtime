@@ -1,7 +1,7 @@
 # local-ai-runtime
 
-> BYOK hybrid local AI chat runtime — run any model from anywhere.
-> Local GGUF (llama.cpp), Ollama, vLLM, OpenAI, Anthropic, Gemini, or any OpenAI-compatible endpoint.
+> BYOK hybrid local AI runtime — 10+ backends, first-run onboarding, OpenAI-compatible `/v1` gateway.
+> Local GGUF / Ollama / vLLM / LM Studio, cloud BYOK (OpenAI, Anthropic, Gemini, Groq, …), or routers like 9router.
 
 ---
 
@@ -31,28 +31,39 @@ cd local-ai-runtime
 # Install dependencies with uv
 uv sync
 
-# Start the backend
+# Start the runtime (API + onboarding UI)
 uv run local-ai-runtime
-
-# Start the frontend (separate terminal)
-cd frontend && npm install && npm run dev
 ```
+
+Open `http://localhost:8000` — the onboarding wizard asks you to pick a provider and paste a key (or point at a local engine).
 
 ---
 
 ## What This Is
 
-A self-hosted AI chat application that supports **any inference backend** via BYOK (Bring Your Own Key):
+A self-hosted AI chat + gateway that supports **any inference backend** via BYOK (Bring Your Own Key):
 
-| Backend | Type | Config |
-|---------|------|--------|
-| **llama-cpp** | Local GGUF | `model_file` in config |
-| **Ollama** | Local | `ollama` running locally |
-| **vLLM** | Local | `vllm serve` running |
-| **OpenAI** | API (paid) | `OPENAI_API_KEY` env var |
-| **Anthropic** | API (paid) | `ANTHROPIC_API_KEY` env var |
-| **Gemini** | API (free tier) | `GEMINI_API_KEY` env var |
-| **OpenAI-compatible** | API (any) | Any LiteLLM/LM Studio/etc. |
+| Provider | Type | Config |
+|----------|------|--------|
+| **llama.cpp** | Local GGUF | file in `models/` |
+| **Ollama** | Local | `ollama serve` |
+| **vLLM** | Local | OpenAI-compatible server |
+| **LM Studio** | Local | `http://127.0.0.1:1234/v1` |
+| **OpenAI** | API | `OPENAI_API_KEY` |
+| **Anthropic** | API | `ANTHROPIC_API_KEY` |
+| **Gemini** | API | `GEMINI_API_KEY` |
+| **OpenRouter / Groq / DeepSeek / Mistral / Together / Fireworks / xAI** | API | provider env key |
+| **9router** | Router | `http://127.0.0.1:20128/api/v1` |
+| **Custom** | Any `/v1` | base URL + optional key |
+
+After onboarding, other apps can use the **OpenAI-compatible gateway**:
+
+```bash
+export OPENAI_BASE_URL=http://127.0.0.1:8000/v1
+# then any OpenAI SDK client works against the active provider
+```
+
+Endpoints: `GET /v1/models`, `POST /v1/chat/completions` (streaming supported).
 
 ---
 
@@ -151,13 +162,17 @@ Supported templates: `chatml`, `llama3`, `llama2`, `mistral`, `alpaca`, `raw`, o
 | Method | Path | Description |
 |--------|------|-------------|
 | `GET` | `/status` | Health check, model state |
-| `GET` | `/models` | List available model files |
+| `GET` | `/models` | List available GGUF files |
 | `GET` | `/models/detect` | Auto-detect model metadata |
 | `GET` | `/config` | Get active configuration |
 | `PUT` | `/config` | Update configuration |
-| `GET` | `/config/backends` | List available backends |
+| `GET` | `/config/backends` | List inference engines |
+| `GET` | `/config/providers` | Onboarding provider catalog (10+) |
+| `POST` | `/config/apikey` | Configure a provider (BYOK) |
 | `POST` | `/chat` | Send message, get response |
 | `POST` | `/chat/stream` | Stream response (SSE) |
+| `GET` | `/v1/models` | OpenAI-compatible model list |
+| `POST` | `/v1/chat/completions` | OpenAI-compatible chat (stream OK) |
 | `GET` | `/conversations` | List conversations |
 | `POST` | `/conversations` | Create conversation |
 | `GET` | `/metrics` | Performance metrics |

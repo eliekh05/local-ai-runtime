@@ -7,8 +7,8 @@ local_ai_runtime = ["static/*"]
 
 [project]
 name = "local-ai-runtime"
-version = "0.1.26"
-description = "Local AI chat runtime — BYOK hybrid inference (llama.cpp, ollama, vLLM, OpenAI, Anthropic, Gemini, any OpenAI-compatible)"
+version = "0.1.27"
+description = "BYOK hybrid local AI runtime — 10+ backends, onboarding, OpenAI-compatible /v1 gateway"
 requires-python = ">=3.11"
 dependencies = [
     "fastapi>=0.100.0",

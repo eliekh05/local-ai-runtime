@@ -88,6 +88,7 @@ class ModelConfig:
     """Complete configuration for one model — all from config, no hardcoded defaults."""
     model_file: str = ""
     backend_type: str = "llama-cpp"
+    provider_id: str = ""
     chat_template: str = "auto"
     context_length: int = 4096
     system_prompt: str = "You are a helpful assistant."
@@ -111,6 +112,7 @@ class ModelConfig:
         return {
             "profile_name": self.profile_name,
             "backend_type": self.backend_type,
+            "provider_id": self.provider_id,
             "model_file": self.model_file,
             "chat_template": self.chat_template,
             "context_length": self.context_length,
@@ -148,6 +150,7 @@ class ModelConfig:
         return cls(
             model_file=data.get("model_file", ""),
             backend_type=data.get("backend_type", "llama-cpp"),
+            provider_id=data.get("provider_id", ""),
             chat_template=data.get("chat_template", "auto"),
             context_length=data.get("context_length", 4096),
             system_prompt=data.get("system_prompt", "You are a helpful assistant."),
@@ -179,7 +182,7 @@ class ModelConfig:
             return bool(base)
         if bt in ("openai", "anthropic", "gemini"):
             return True
-        return bool(self.model_file)
+        return bool(self.model_file or self.provider_id)
 
 
 @dataclass
