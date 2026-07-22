@@ -1,5 +1,5 @@
 """
-FastAPI application factory — config-driven, zero hardcoded values.
+FastAPI application — serves API + frontend from one package.
 """
 
 import time
@@ -8,16 +8,16 @@ from pathlib import Path
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
-from fastapi.responses import RedirectResponse
+from fastapi.responses import RedirectResponse, FileResponse
+from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
-
 
 logger = logging.getLogger("local-ai-runtime")
 
+STATIC_DIR = Path(__file__).parent / "static"
+
 
 def create_app(server_config: dict) -> FastAPI:
-    """Build the FastAPI app from config dict."""
-
     @asynccontextmanager
     async def lifespan(app: FastAPI):
         logger.info(f"Server starting on {server_config['host']}:{server_config['port']}")
@@ -26,12 +26,11 @@ def create_app(server_config: dict) -> FastAPI:
 
     app = FastAPI(
         title="local-ai-runtime",
-        description="Local AI chat runtime — BYOK hybrid inference",
+        description="BYOK hybrid local AI chat runtime",
         version="0.1.0",
         lifespan=lifespan,
     )
 
-    # Request logging
     @app.middleware("http")
     async def log_requests(request: Request, call_next):
         start = time.time()
@@ -40,7 +39,6 @@ def create_app(server_config: dict) -> FastAPI:
         logger.info(f"{request.method} {request.url.path} -> {response.status_code} ({elapsed:.3f}s)")
         return response
 
-    # CORS — from config only
     cors_origins = server_config.get("cors_origins", [])
     if cors_origins:
         app.add_middleware(
@@ -50,11 +48,7 @@ def create_app(server_config: dict) -> FastAPI:
             allow_headers=["*"],
         )
 
-    @app.get("/")
-    async def root():
-        return RedirectResponse(url="/docs")
-
-    # Routes
+    # API routes
     from backend.routes.status import router as status_router
     from backend.routes.models import router as models_router
     from backend.routes.config import router as config_router
@@ -62,12 +56,23 @@ def create_app(server_config: dict) -> FastAPI:
     from backend.routes.conversations import router as conversations_router
     from backend.routes.metrics import router as metrics_router
 
-    api_prefix = server_config.get("api_prefix", "")
-    app.include_router(status_router, prefix=f"{api_prefix}/status", tags=["status"])
-    app.include_router(models_router, prefix=f"{api_prefix}/models", tags=["models"])
-    app.include_router(config_router, prefix=f"{api_prefix}/config", tags=["config"])
-    app.include_router(chat_router, prefix=f"{api_prefix}/chat", tags=["chat"])
-    app.include_router(conversations_router, prefix=f"{api_prefix}/conversations", tags=["conversations"])
-    app.include_router(metrics_router, prefix=f"{api_prefix}/metrics", tags=["metrics"])
+    prefix = server_config.get("api_prefix", "")
+    app.include_router(status_router, prefix=f"{prefix}/status", tags=["status"])
+    app.include_router(models_router, prefix=f"{prefix}/models", tags=["models"])
+    app.include_router(config_router, prefix=f"{prefix}/config", tags=["config"])
+    app.include_router(chat_router, prefix=f"{prefix}/chat", tags=["chat"])
+    app.include_router(conversations_router, prefix=f"{prefix}/conversations", tags=["conversations"])
+    app.include_router(metrics_router, prefix=f"{prefix}/metrics", tags=["metrics"])
+
+    # Serve frontend at /
+    index = STATIC_DIR / "index.html"
+    if index.exists():
+        @app.get("/", include_in_schema=False)
+        async def root():
+            return FileResponse(str(index))
+    else:
+        @app.get("/", include_in_schema=False)
+        async def root():
+            return RedirectResponse(url="/docs")
 
     return app
