@@ -12,7 +12,14 @@ echo "Version: $CURRENT -> $NEW"
 
 rm -rf dist
 uv build
-uv publish
+
+# Publish — enter __token__ + your PyPI token when prompted
+echo ""
+echo "Enter PyPI credentials when prompted:"
+echo "  Username: __token__"
+echo "  Password: (your pypi token)"
+echo ""
+uv publish --interactive
 
 git add pyproject.toml
 git commit -m "v$NEW"
