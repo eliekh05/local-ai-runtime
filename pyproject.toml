@@ -27,7 +27,11 @@ all = [
 ]
 
 [project.scripts]
-local-ai-runtime = "local_ai_runtime.cli:main"
+local-ai-runtime = "src.local_ai_runtime.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["local_ai_runtime*", "model_runtime*", "backend*"]
 
 [dependency-groups]
 dev = [
