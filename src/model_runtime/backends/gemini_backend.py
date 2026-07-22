@@ -1,132 +1,122 @@
-"""
-Google Gemini API backend.
-"""
+"""Google Gemini API backend — httpx only, no SDK."""
 
+import json
 import os
 import time
 from typing import Generator
 
-from model_runtime.backends.base import Backend, GenerationResult, BackendError
+import httpx
+
+from model_runtime.backends.base import Backend, BackendError, GenerationResult
 
 
 class GeminiBackend(Backend):
-    """Google Gemini API backend (BYOK)."""
-
     def __init__(self, config: dict | None = None):
         self._config = config or {}
-        self._client = None
-        self._model = self._config.get("model", "gemini-2.0-flash")
+        self._api_key = ""
+        self._model = "gemini-2.0-flash"
 
     @property
     def name(self) -> str:
         return "gemini"
 
     def is_available(self) -> bool:
-        return True  # API backend — always available, needs key at call time
+        return True
 
     def load_model(self, model_config: dict) -> None:
-        if not self.is_available():
-            api_key_env = self._config.get("api_key_env", "GEMINI_API_KEY")
-            raise BackendError(f"Gemini API key not found. Set {api_key_env} environment variable.")
-
-        try:
-            import google.generativeai as genai
-        except ImportError:
-            raise BackendError("google-generativeai not installed. Run: uv pip install google-generativeai")
-
-        api_key_env = self._config.get("api_key_env", "GEMINI_API_KEY")
-        genai.configure(api_key=os.environ.get(api_key_env))
-        self._model = model_config.get("gemini_model", self._config.get("model", "gemini-2.0-flash"))
-        self._client = genai.GenerativeModel(self._model)
+        self._api_key = os.environ.get(self._config.get("api_key_env", "GEMINI_API_KEY"), "")
+        self._model = (
+            model_config.get("gemini_model")
+            or model_config.get("model_file")
+            or self._config.get("model")
+            or "gemini-2.0-flash"
+        )
+        if not self._api_key:
+            raise BackendError("Set GEMINI_API_KEY env var")
 
     def unload_model(self) -> None:
-        self._client = None
+        self._api_key = ""
 
-    def generate(self, messages: list[dict], params: dict | None = None) -> GenerationResult:
-        if not self._client:
-            raise BackendError("Gemini client not initialized.")
+    def _url(self, method: str = "generateContent", extra_query: str = "") -> str:
+        q = f"key={self._api_key}"
+        if extra_query:
+            q = f"{extra_query}&{q}"
+        return (
+            f"https://generativelanguage.googleapis.com/v1beta/models/"
+            f"{self._model}:{method}?{q}"
+        )
 
-        params = params or {}
-
-        # Build prompt from messages
-        system_msg = ""
-        chat_parts = []
+    def _build_body(self, messages: list[dict], params: dict) -> dict:
+        system = ""
+        parts = []
         for m in messages:
             if m.get("role") == "system":
-                system_msg = m.get("content", "")
+                system = m.get("content", "")
             else:
-                chat_parts.append(f"{m.get('role', 'user')}: {m.get('content', '')}")
+                parts.append({"text": f"{m.get('role', 'user')}: {m.get('content', '')}"})
+        body: dict = {"contents": [{"parts": parts or [{"text": ""}]}]}
+        if system:
+            body["systemInstruction"] = {"parts": [{"text": system}]}
+        body["generationConfig"] = {
+            "temperature": params.get("temperature", 0.7),
+            "topP": params.get("top_p", 0.9),
+            "maxOutputTokens": params.get("max_new_tokens", 512),
+        }
+        return body
 
-        prompt = ""
-        if system_msg:
-            prompt = f"System: {system_msg}\n\n"
-        prompt += "\n".join(chat_parts)
-
+    def generate(self, messages: list[dict], params: dict | None = None) -> GenerationResult:
+        if not self._api_key:
+            raise BackendError("No API key")
+        params = params or {}
+        body = self._build_body(messages, params)
         start = time.time()
-        try:
-            response = self._client.generate_content(
-                prompt,
-                generation_config={
-                    "temperature": params.get("temperature", 0.7),
-                    "top_p": params.get("top_p", 0.9),
-                    "max_output_tokens": params.get("max_new_tokens", 512),
-                },
-            )
-        except Exception as e:
-            raise BackendError(f"Gemini API error: {e}")
-
-        elapsed = time.time() - start
-        text = response.text or ""
-        usage = response.usage_metadata
-
+        resp = httpx.post(self._url(), json=body, timeout=120)
+        if resp.status_code != 200:
+            raise BackendError(f"Gemini {resp.status_code}: {resp.text[:200]}")
+        data = resp.json()
+        text = data["candidates"][0]["content"]["parts"][0]["text"]
+        usage = data.get("usageMetadata", {})
         return GenerationResult(
             text=text,
-            tokens_prompt=usage.prompt_token_count if usage else 0,
-            tokens_gen=usage.candidates_token_count if usage else 0,
+            tokens_prompt=usage.get("promptTokenCount", 0),
+            tokens_gen=usage.get("candidatesTokenCount", 0),
             finish_reason="stop",
-            elapsed=elapsed,
+            elapsed=time.time() - start,
             backend=self.name,
         )
 
-    def generate_stream(self, messages: list[dict], params: dict | None = None) -> Generator[str, None, None]:
-        if not self._client:
-            raise BackendError("Gemini client not initialized.")
-
+    def generate_stream(
+        self, messages: list[dict], params: dict | None = None
+    ) -> Generator[str, None, None]:
+        if not self._api_key:
+            raise BackendError("No API key")
         params = params or {}
-
-        system_msg = ""
-        chat_parts = []
-        for m in messages:
-            if m.get("role") == "system":
-                system_msg = m.get("content", "")
-            else:
-                chat_parts.append(f"{m.get('role', 'user')}: {m.get('content', '')}")
-
-        prompt = ""
-        if system_msg:
-            prompt = f"System: {system_msg}\n\n"
-        prompt += "\n".join(chat_parts)
-
-        try:
-            response = self._client.generate_content(
-                prompt,
-                generation_config={
-                    "temperature": params.get("temperature", 0.7),
-                    "top_p": params.get("top_p", 0.9),
-                    "max_output_tokens": params.get("max_new_tokens", 512),
-                },
-                stream=True,
-            )
-            for chunk in response:
-                if chunk.text:
-                    yield chunk.text
-        except Exception as e:
-            raise BackendError(f"Gemini stream error: {e}")
+        body = self._build_body(messages, params)
+        with httpx.stream(
+            "POST",
+            self._url("streamGenerateContent", extra_query="alt=sse"),
+            json=body,
+            timeout=120,
+        ) as resp:
+            if resp.status_code != 200:
+                raise BackendError(f"Gemini stream {resp.status_code}: {resp.read().decode()[:200]}")
+            for line in resp.iter_lines():
+                if not line.startswith("data: "):
+                    continue
+                data = json.loads(line[6:])
+                text = (
+                    data.get("candidates", [{}])[0]
+                    .get("content", {})
+                    .get("parts", [{}])[0]
+                    .get("text", "")
+                )
+                if text:
+                    yield text
 
     def health_check(self) -> dict:
         return {
             "backend": self.name,
             "available": self.is_available(),
-            "model_loaded": self._client is not None,
+            "model_loaded": bool(self._api_key),
             "model": self._model,
         }

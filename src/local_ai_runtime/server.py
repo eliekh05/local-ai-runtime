@@ -13,24 +13,28 @@ from fastapi.middleware.cors import CORSMiddleware
 
 logger = logging.getLogger("local-ai-runtime")
 
-# Load frontend HTML at import time
-_INDEX_HTML = ""
-_static_path = Path(__file__).parent / "static" / "index.html"
-if _static_path.exists():
-    _INDEX_HTML = _static_path.read_text()
+_STATIC_PATH = Path(__file__).parent / "static" / "index.html"
 
 
 def create_app(server_config: dict) -> FastAPI:
+    index_html = _STATIC_PATH.read_text() if _STATIC_PATH.exists() else ""
+
     @asynccontextmanager
     async def lifespan(app: FastAPI):
         logger.info(f"Server starting on {server_config['host']}:{server_config['port']}")
         yield
         logger.info("Server shutting down")
 
+    try:
+        from importlib.metadata import version as pkg_version
+        app_version = pkg_version("local-ai-runtime")
+    except Exception:
+        app_version = "0.1.25"
+
     app = FastAPI(
         title="local-ai-runtime",
         description="BYOK hybrid local AI chat runtime",
-        version="0.1.0",
+        version=app_version,
         lifespan=lifespan,
     )
 
@@ -68,10 +72,10 @@ def create_app(server_config: dict) -> FastAPI:
     app.include_router(metrics_router, prefix=f"{prefix}/metrics", tags=["metrics"])
 
     # Serve frontend
-    if _INDEX_HTML:
+    if index_html:
         @app.get("/", include_in_schema=False)
         async def root():
-            return HTMLResponse(content=_INDEX_HTML)
+            return HTMLResponse(content=index_html)
     else:
         @app.get("/", include_in_schema=False)
         async def root():

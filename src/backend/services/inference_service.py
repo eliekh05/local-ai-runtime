@@ -7,7 +7,6 @@ from typing import Generator
 
 from model_runtime.backends import get_backend, BackendError
 from model_runtime.chat_template_auto import auto_detect_template
-from backend.models.chat_message import ChatMessage, Role
 from backend.services.model_service import get_active_config
 
 
@@ -45,21 +44,48 @@ def _get_backend_and_config():
     if not config:
         raise InferenceError("No active model configuration. Set one via PUT /config.")
 
-    config_dict = config.to_dict() if hasattr(config, "to_dict") else config
+    config_dict = config.to_dict() if hasattr(config, "to_dict") else dict(config)
     backend_type = config_dict.get("backend_type", "llama-cpp")
-    api_backends = config_dict.get("api_backends", {})
-    backend_config = {}
+    api_backends = config_dict.get("api_backends", {}) or {}
+    backend_config = dict(api_backends.get(backend_type, {}))
 
-    if backend_type in api_backends:
-        backend_config = api_backends[backend_type]
-    elif backend_type == "llama-cpp":
-        backend_config = {"models_dir": config_dict.get("models_dir", "./models")}
-    elif backend_type == "ollama":
-        backend_config = api_backends.get("ollama", {})
-    elif backend_type == "vllm":
-        backend_config = api_backends.get("vllm", {})
+    if backend_type == "llama-cpp":
+        backend_config["models_dir"] = config_dict.get("models_dir", "./models")
+    elif backend_type == "openai_compatible":
+        if config_dict.get("compatible_base_url"):
+            backend_config["base_url"] = config_dict["compatible_base_url"]
+        if config_dict.get("compatible_model"):
+            backend_config["model"] = config_dict["compatible_model"]
 
     return backend_type, backend_config, config_dict
+
+
+def _prepare_model_config(backend_type: str, config_dict: dict) -> dict:
+    """Ensure provider-specific model fields are populated for backends."""
+    prepared = dict(config_dict)
+    model_file = prepared.get("model_file", "")
+
+    if backend_type == "llama-cpp":
+        prepared["model_file"] = model_file
+        prepared["models_dir"] = prepared.get("models_dir", "./models")
+    elif backend_type == "ollama":
+        prepared["ollama_model"] = prepared.get("ollama_model") or model_file
+    elif backend_type == "vllm":
+        prepared["vllm_model"] = prepared.get("vllm_model") or model_file
+    elif backend_type == "openai":
+        prepared["openai_model"] = prepared.get("openai_model") or model_file
+    elif backend_type == "anthropic":
+        prepared["anthropic_model"] = prepared.get("anthropic_model") or model_file
+    elif backend_type == "gemini":
+        prepared["gemini_model"] = prepared.get("gemini_model") or model_file
+    elif backend_type == "openai_compatible":
+        prepared["compatible_model"] = prepared.get("compatible_model") or model_file
+        prepared["compatible_base_url"] = (
+            prepared.get("compatible_base_url")
+            or (prepared.get("api_backends") or {}).get("openai_compatible", {}).get("base_url", "")
+        )
+
+    return prepared
 
 
 async def generate_response(message, conversation_id=None, conversation_history=None) -> InferenceResult:
@@ -71,13 +97,7 @@ async def generate_response(message, conversation_id=None, conversation_history=
     except Exception as e:
         raise InferenceError(f"Failed to load config: {e}")
 
-    if backend_type == "llama-cpp":
-        backend_config["model_file"] = config_dict.get("model_file", "")
-        backend_config["models_dir"] = config_dict.get("models_dir", "./models")
-    elif backend_type == "ollama":
-        backend_config["model"] = config_dict.get("ollama_model", backend_config.get("model", ""))
-    elif backend_type == "vllm":
-        backend_config["model"] = config_dict.get("vllm_model", backend_config.get("model", ""))
+    model_config = _prepare_model_config(backend_type, config_dict)
 
     try:
         backend = get_backend(backend_type, config=backend_config)
@@ -88,7 +108,7 @@ async def generate_response(message, conversation_id=None, conversation_history=
         raise InferenceError(f"Backend '{backend_type}' is not available.")
 
     try:
-        backend.load_model(config_dict)
+        backend.load_model(model_config)
     except BackendError as e:
         raise InferenceError(f"Failed to load model: {e}")
 
@@ -98,14 +118,14 @@ async def generate_response(message, conversation_id=None, conversation_history=
     if template == "auto":
         template = auto_detect_template(messages)
 
-    gen_params = config_dict.get("generation", {})
+    gen_params = dict(config_dict.get("generation", {}) or {})
     gen_params["chat_template"] = template
 
     try:
         result = backend.generate(messages, params=gen_params)
         return InferenceResult(
             content=result.text,
-            model_name=config_dict.get("model_file", backend_type),
+            model_name=model_config.get("model_file") or backend_type,
             tokens_used=result.total_tokens,
             finish_reason=result.finish_reason,
             backend=result.backend,
@@ -122,13 +142,7 @@ def generate_stream_response(message, conversation_history=None) -> Generator[st
         yield "[Error: No config loaded]"
         return
 
-    if backend_type == "llama-cpp":
-        backend_config["model_file"] = config_dict.get("model_file", "")
-        backend_config["models_dir"] = config_dict.get("models_dir", "./models")
-    elif backend_type == "ollama":
-        backend_config["model"] = config_dict.get("ollama_model", backend_config.get("model", ""))
-    elif backend_type == "vllm":
-        backend_config["model"] = config_dict.get("vllm_model", backend_config.get("model", ""))
+    model_config = _prepare_model_config(backend_type, config_dict)
 
     try:
         backend = get_backend(backend_type, config=backend_config)
@@ -141,7 +155,7 @@ def generate_stream_response(message, conversation_history=None) -> Generator[st
         return
 
     try:
-        backend.load_model(config_dict)
+        backend.load_model(model_config)
     except BackendError as e:
         yield f"[Error: {e}]"
         return
@@ -152,7 +166,7 @@ def generate_stream_response(message, conversation_history=None) -> Generator[st
     if template == "auto":
         template = auto_detect_template(messages)
 
-    gen_params = config_dict.get("generation", {})
+    gen_params = dict(config_dict.get("generation", {}) or {})
     gen_params["chat_template"] = template
 
     try:

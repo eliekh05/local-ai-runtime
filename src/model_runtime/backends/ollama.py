@@ -33,7 +33,13 @@ class OllamaBackend(Backend):
             return False
 
     def load_model(self, model_config: dict) -> None:
-        self._model = model_config.get("ollama_model", self._config.get("model", ""))
+        self._base_url = self._config.get("base_url", self._base_url)
+        self._model = (
+            model_config.get("ollama_model")
+            or model_config.get("model_file")
+            or self._config.get("model")
+            or ""
+        )
         if not self._model:
             raise BackendError("No ollama model specified. Set 'ollama_model' in config.")
 

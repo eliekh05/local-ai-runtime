@@ -59,12 +59,21 @@ def _get_all_backend_classes() -> dict[str, type[Backend]]:
 
 
 def get_backend(name: str, config: dict | None = None) -> Backend:
-    """Get or create a backend instance by name."""
+    """Get or create a backend instance by name.
+
+    Always refresh `_config` so wizard/config updates take effect without restart.
+    """
+    classes = _get_all_backend_classes()
+    if name not in classes:
+        raise ValueError(f"Unknown backend: '{name}'. Available: {list(classes.keys())}")
+
+    cfg = config or {}
     if name not in _backend_instances:
-        classes = _get_all_backend_classes()
-        if name not in classes:
-            raise ValueError(f"Unknown backend: '{name}'. Available: {list(classes.keys())}")
-        _backend_instances[name] = classes[name](config=config or {})
+        _backend_instances[name] = classes[name](config=cfg)
+    else:
+        backend = _backend_instances[name]
+        if hasattr(backend, "_config"):
+            backend._config = cfg
     return _backend_instances[name]
 
 

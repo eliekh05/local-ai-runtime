@@ -26,7 +26,6 @@
 .send{padding:.5rem 1.25rem;border-radius:6px;border:none;background:var(--accent);color:#fff;cursor:pointer;font-weight:500}.send:hover{opacity:.9}.send:disabled{cursor:not-allowed;opacity:.4}
 .error{background:rgba(248,81,73,.15);border:1px solid var(--error);border-radius:6px;padding:.5rem 1rem;display:flex;align-items:center;gap:.75rem;color:var(--error);font-size:.875rem}
 .error button{background:var(--error);color:#fff;border:none;padding:.25rem .75rem;border-radius:4px;cursor:pointer}
-/* Setup */
 .setup{max-width:480px;margin:auto;padding:2rem;width:100%}.setup h2{margin-bottom:1.5rem;text-align:center;color:var(--accent);font-size:1.3rem}
 .provider-grid{display:flex;flex-direction:column;gap:.5rem;margin-bottom:1.5rem}
 .provider-btn{padding:.75rem 1rem;border-radius:8px;border:1px solid var(--border);background:var(--surface);color:var(--text);cursor:pointer;text-align:left;font-size:.9rem;display:flex;justify-content:space-between;align-items:center}
@@ -36,10 +35,11 @@
 .key-form{margin-top:1rem;display:none}.key-form.active{display:block}
 .key-form label{display:block;font-size:.8rem;color:var(--muted);margin-bottom:.25rem}
 .key-form input,.key-form select{width:100%;padding:.5rem;border-radius:6px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:.9rem;margin-bottom:.75rem}
-.key-form input:focus{outline:none;border-color:var(--accent)}
+.key-form input:focus,.key-form select:focus{outline:none;border-color:var(--accent)}
 .start-btn{width:100%;padding:.6rem;border-radius:6px;border:none;background:var(--accent);color:#fff;cursor:pointer;font-weight:600;font-size:1rem;margin-top:.5rem}
 .start-btn:hover{opacity:.9}.start-btn:disabled{opacity:.4;cursor:not-allowed}
 .hint{font-size:.75rem;color:var(--muted);margin-top:.5rem}
+.setup-error{color:var(--error);font-size:.85rem;margin-top:.75rem}
 @media(max-width:640px){.msg{max-width:95%}.header{padding:.5rem}.input-bar{padding:.5rem}}
 </style>
 </head>
@@ -54,27 +54,34 @@ const PROVIDERS=[
   {id:"ollama",name:"Ollama",desc:"Local models via ollama serve",badge:"local",needsKey:false},
   {id:"llama-cpp",name:"llama.cpp",desc:"Local GGUF files",badge:"local",needsKey:false},
   {id:"vllm",name:"vLLM",desc:"High-throughput local inference",badge:"local",needsKey:false},
-  {id:"openai",name:"OpenAI",desc:"GPT-4o, GPT-4o-mini",badge:"api",needsKey:true,keyEnv:"OPENAI_API_KEY",placeholder:"sk-..."},
-  {id:"anthropic",name:"Anthropic",desc:"Claude Sonnet, Claude Haiku",badge:"api",needsKey:true,keyEnv:"ANTHROPIC_API_KEY",placeholder:"sk-ant-..."},
-  {id:"gemini",name:"Google Gemini",desc:"Gemini 2.0 Flash, Gemini Pro",badge:"api",needsKey:true,keyEnv:"GEMINI_API_KEY",placeholder:"AIza..."},
+  {id:"openai",name:"OpenAI",desc:"GPT-4o, GPT-4o-mini",badge:"api",needsKey:true,placeholder:"sk-..."},
+  {id:"anthropic",name:"Anthropic",desc:"Claude Sonnet, Claude Haiku",badge:"api",needsKey:true,placeholder:"sk-ant-..."},
+  {id:"gemini",name:"Google Gemini",desc:"Gemini 2.0 Flash, Gemini Pro",badge:"api",needsKey:true,placeholder:"AIza..."},
   {id:"openai_compatible",name:"OpenAI Compatible",desc:"LiteLLM, LM Studio, any /v1 endpoint",badge:"api",needsKey:false,needsUrl:true},
 ];
 
 const MODELS={
-  "openai":["gpt-4o","gpt-4o-mini","gpt-4-turbo","o1-mini","o3-mini"],
-  "anthropic":["claude-sonnet-4-20250514","claude-haiku-4-5-20251001","claude-opus-4-20250514"],
-  "gemini":["gemini-2.0-flash","gemini-2.5-pro","gemini-2.5-flash"],
-  "ollama":[],
-  "llama-cpp":[],
-  "vllm":[],
-  "openai_compatible":[],
+  openai:["gpt-4o","gpt-4o-mini","gpt-4-turbo","o1-mini","o3-mini"],
+  anthropic:["claude-sonnet-4-20250514","claude-haiku-4-5-20251001","claude-opus-4-20250514"],
+  gemini:["gemini-2.0-flash","gemini-2.5-pro","gemini-2.5-flash"],
 };
 
 let messages=[],conversationId=null,loading=false,error=null,needsSetup=true;
 const app=document.getElementById("app");
 
 async function checkSetup(){
-  try{const r=await fetch(`${API}/config/`);if(!r.ok){needsSetup=true;return}const c=await r.json();needsSetup=!c.model_file}catch{needsSetup=true}
+  try{
+    const r=await fetch(`${API}/config/`);
+    if(!r.ok){needsSetup=true;return}
+    const c=await r.json();
+    needsSetup=c.ready!==true;
+  }catch{needsSetup=true}
+}
+
+function showForm(id){
+  document.querySelectorAll(".key-form").forEach(f=>f.classList.remove("active"));
+  const form=document.getElementById(`form-${id}`);
+  if(form)form.classList.add("active");
 }
 
 function render(){
@@ -85,17 +92,15 @@ function render(){
 
 function renderSetup(){
   app.innerHTML="";
-  const s=$("div",{class:"setup"},$("h2",{html:">> local-ai-runtime"}));
+  const s=$("div",{class:"setup"},$("h2",{},">> local-ai-runtime"));
   const grid=$("div",{class:"provider-grid"});
   let selected=null;
+  const err=$("div",{class:"setup-error",id:"setup-error"});
 
   PROVIDERS.forEach(p=>{
     const btn=$("div",{class:"provider-btn",on:{click:()=>{
       grid.querySelectorAll(".provider-btn").forEach(b=>b.classList.remove("selected"));
-      btn.classList.add("selected");selected=p;
-      document.querySelectorAll(".key-form").forEach(f=>f.classList.remove("active"));
-      const form=document.getElementById(`form-${p.id}`);
-      if(form)form.classList.add("active");
+      btn.classList.add("selected");selected=p;showForm(p.id);err.textContent="";
     }}},
       $("div",{},$("div",{class:"name"},p.name),$("div",{class:"desc"},p.desc)),
       $("span",{class:"badge"},p.badge),
@@ -104,88 +109,99 @@ function renderSetup(){
   });
   s.appendChild(grid);
 
-  // API key forms for each provider
   PROVIDERS.filter(p=>p.needsKey).forEach(p=>{
+    const modelSel=$("select",{id:`model-sel-${p.id}`});
+    (MODELS[p.id]||[]).forEach(m=>modelSel.appendChild($("option",{value:m},m)));
     const form=$("div",{class:"key-form",id:`form-${p.id}`},
       $("label",{},`${p.name} API Key`),
       $("input",{type:"password",id:`key-${p.id}`,placeholder:p.placeholder||"API key"}),
+      $("label",{},"Model"),
+      modelSel,
     );
     s.appendChild(form);
   });
 
-  // URL form for openai_compatible
-  {
-    const form=$("div",{class:"key-form",id:"form-openai_compatible"},
-      $("label",{},),
-      $("input",{type:"url",id:"url-openai_compatible",placeholder:"http://localhost:1234/v1"}),
-      $("label",{},),
-      $("input",{type:"text",id:"model-openai_compatible",placeholder:"model-name (or leave blank)"}),
-      $("label",{},),
-      $("input",{type:"password",id:"key-openai_compatible",placeholder:"API key (or leave blank)"}),
-    );
-    s.appendChild(form);
-  }
+  s.appendChild($("div",{class:"key-form",id:"form-openai_compatible"},
+    $("label",{},"Base URL"),
+    $("input",{type:"url",id:"url-openai_compatible",placeholder:"http://localhost:1234/v1"}),
+    $("label",{},"Model"),
+    $("input",{type:"text",id:"model-openai_compatible",placeholder:"model-name (or leave blank)"}),
+    $("label",{},"API Key (optional)"),
+    $("input",{type:"password",id:"key-openai_compatible",placeholder:"API key (or leave blank)"}),
+  ));
 
-  // Ollama model input
-  {
-    const form=$("div",{class:"key-form",id:"form-ollama"},
-      $("label",{},),
-      $("input",{type:"text",id:"model-ollama",placeholder:"e.g. llama3, mistral, phi3"}),
-      $("div",{class:"hint"},"Make sure ollama serve is running. Models: ollama pull <name>"),
-    );
-    s.appendChild(form);
-  }
+  s.appendChild($("div",{class:"key-form",id:"form-ollama"},
+    $("label",{},"Ollama model"),
+    $("input",{type:"text",id:"model-ollama",placeholder:"e.g. llama3, mistral, phi3"}),
+    $("div",{class:"hint"},"Make sure ollama serve is running. Models: ollama pull <name>"),
+  ));
 
-  // vLLM model input
-  {
-    const form=$("div",{class:"key-form",id:"form-vllm"},
-      $("label",{},),
-      $("input",{type:"text",id:"model-vllm",placeholder:"e.g. meta-llama/Llama-3-8B-Instruct"}),
-      $("div",{class:"hint"},"vLLM server must be running at http://localhost:8000"),
-    );
-    s.appendChild(form);
-  }
+  s.appendChild($("div",{class:"key-form",id:"form-vllm"},
+    $("label",{},"vLLM model"),
+    $("input",{type:"text",id:"model-vllm",placeholder:"e.g. meta-llama/Llama-3-8B-Instruct"}),
+    $("div",{class:"hint"},"vLLM server must be running at http://localhost:8000"),
+  ));
 
-  // llama-cpp file input
-  {
-    const form=$("div",{class:"key-form",id:"form-llama-cpp"},
-      $("label",{},),
-      $("input",{type:"text",id:"model-llama-cpp",placeholder:"e.g. mistral-7b-instruct.Q4_K_M.gguf"}),
-      $("div",{class:"hint"},"Drop .gguf file in models/ directory"),
-    );
-    s.appendChild(form);
-  }
+  s.appendChild($("div",{class:"key-form",id:"form-llama-cpp"},
+    $("label",{},"GGUF filename"),
+    $("input",{type:"text",id:"model-llama-cpp",placeholder:"e.g. mistral-7b-instruct.Q4_K_M.gguf"}),
+    $("div",{class:"hint"},"Drop .gguf file in models/ directory"),
+  ));
 
   const btn=$("button",{class:"start-btn",on:{click:async()=>{
-    if(!selected)return;
+    if(!selected){err.textContent="Select a provider first.";return}
+    err.textContent="";
     const body={backend_type:selected.id};
-    const modelInput=document.getElementById(`model-${selected.id}`);
-    if(modelInput&&modelInput.value.trim())body.model_file=modelInput.value.trim();
 
-    // Save API key
     if(selected.needsKey){
       const keyInput=document.getElementById(`key-${selected.id}`);
-      if(keyInput&&keyInput.value.trim()){
-        await fetch(`${API}/config/apikey/`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({backend:selected.id,api_key:keyInput.value.trim()})});
+      const key=keyInput?.value?.trim();
+      if(!key){err.textContent=`Enter your ${selected.name} API key.`;return}
+      await fetch(`${API}/config/apikey/`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({backend:selected.id,api_key:key})});
+      const modelSel=document.getElementById(`model-sel-${selected.id}`);
+      if(modelSel?.value){
+        body.model_file=modelSel.value;
+        if(selected.id==="openai")body.openai_model=modelSel.value;
+        if(selected.id==="anthropic")body.anthropic_model=modelSel.value;
+        if(selected.id==="gemini")body.gemini_model=modelSel.value;
       }
     }
 
-    // Set model for openai/anthropic/gemini
-    const modelSel=document.getElementById(`model-sel-${selected.id}`);
-    if(modelSel&&modelSel.value){body.model_file=modelSel.value;}
-
-    // OpenAI-compatible URL
+    if(selected.id==="ollama"){
+      const model=document.getElementById("model-ollama")?.value?.trim();
+      if(!model){err.textContent="Enter an Ollama model name.";return}
+      body.model_file=model;body.ollama_model=model;
+    }
+    if(selected.id==="vllm"){
+      const model=document.getElementById("model-vllm")?.value?.trim();
+      if(model){body.model_file=model;body.vllm_model=model}
+    }
+    if(selected.id==="llama-cpp"){
+      const model=document.getElementById("model-llama-cpp")?.value?.trim();
+      if(!model){err.textContent="Enter a GGUF filename from models/.";return}
+      body.model_file=model;
+    }
     if(selected.needsUrl){
       const url=document.getElementById("url-openai_compatible")?.value?.trim();
       const model=document.getElementById("model-openai_compatible")?.value?.trim();
       const key=document.getElementById("key-openai_compatible")?.value?.trim();
-      if(url)body.model_file=model||"default";
+      if(!url){err.textContent="Enter a base URL.";return}
+      body.compatible_base_url=url;
+      body.model_file=model||"default";
+      if(model)body.compatible_model=model;
+      await fetch(`${API}/config/apikey/`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({backend:"openai_compatible",api_key:key||"",base_url:url,model:model||""})});
     }
 
-    await fetch(`${API}/config/`,{method:"PUT",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
+    const res=await fetch(`${API}/config/`,{method:"PUT",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
+    if(!res.ok){
+      const detail=await res.json().catch(()=>({}));
+      err.textContent=detail.detail||`Config update failed (${res.status})`;
+      return;
+    }
     needsSetup=false;render();
   }}},">> Start");
   s.appendChild(btn);
+  s.appendChild(err);
   app.appendChild(s);
 }
 
@@ -197,7 +213,11 @@ function renderChat(){
     document.getElementById("status").innerHTML=`<span class="dot ${s.status==="ok"?"dot-ok":"dot-err"}"></span> v${s.version||"?"}${s.model_loaded&&s.current_model?" · "+s.current_model:""}`;
   }).catch(()=>{document.getElementById("status").innerHTML=`<span class="dot dot-err"></span> unreachable`});
 
-  // Model selector
+  fetch(`${API}/config/`).then(r=>r.json()).then(c=>{
+    const label=$("span",{style:"font-size:.75rem;color:var(--muted)"},`${c.backend_type||"?"}${c.model_file?" · "+c.model_file:""}`);
+    document.getElementById("controls").appendChild(label);
+  }).catch(()=>{});
+
   fetch(`${API}/models/`).then(r=>r.json()).then(d=>{
     if(!d.models||!d.models.length)return;
     const sel=$("select",{on:{change:e=>{fetch(`${API}/config/`,{method:"PUT",headers:{"Content-Type":"application/json"},body:JSON.stringify({model_file:e.target.value})})}}});
@@ -217,7 +237,7 @@ function renderChat(){
   if(error)app.appendChild($("div",{class:"error"},$("span",{},error),$("button",{on:{click:retryLast}},"Retry")));
   const inp=$("textarea",{id:"input",placeholder:loading?"Waiting...":"Type a message...",rows:"1",on:{keydown:e=>{if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();send()}}}});
   if(loading)inp.disabled=true;
-  const btn=$("button",{class:"send"},);if(loading)btn.disabled=true;btn.onclick=send;
+  const btn=$("button",{class:"send"},"Send");if(loading)btn.disabled=true;btn.onclick=send;
   app.appendChild($("div",{class:"input-bar"},inp,btn));
   chat.scrollTop=chat.scrollHeight;if(!loading)inp.focus();
 }
@@ -226,7 +246,7 @@ async function send(){
   const inp=document.getElementById("input");const text=inp?.value?.trim();if(!text||loading)return;
   messages.push({role:"user",content:text,ts:new Date().toLocaleTimeString()});loading=true;error=null;inp.value="";render();
   try{const res=await fetch(`${API}/chat/stream/`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({message:text,conversation_id:conversationId})});
-  if(!res.ok){const err=await res.json().catch(()=>({detail:"Request failed"}));throw new Error(err.detail||`HTTP ${res.status}`)}
+  if(!res.ok){const err=await res.json().catch(()=>({detail:"Request failed"}));throw new Error(typeof err.detail==="string"?err.detail:`HTTP ${res.status}`)}
   const reader=res.body.getReader(),dec=new TextDecoder();let full="";messages.push({role:"assistant",content:"",ts:""});
   while(true){const{done,value}=await reader.read();if(done)break;for(const line of dec.decode(value,{stream:true}).split("\n")){if(!line.startsWith("data: "))continue;try{const d=JSON.parse(line.slice(6));if(d.done)break;if(d.token){full+=d.token;messages[messages.length-1].content=full;render()}if(d.error){error=d.error;break}}catch{}}}}
   catch(e){error=e.message;messages=messages.filter(m=>!(m.role==="assistant"&&!m.content))}finally{loading=false;render()}

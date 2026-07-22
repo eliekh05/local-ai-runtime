@@ -1,7 +1,7 @@
 """Data models for model configuration and inference I/O."""
 
 from dataclasses import dataclass, field
-from typing import Optional
+from typing import Any, Optional
 
 
 CHAT_TEMPLATES = {
@@ -22,6 +22,41 @@ BACKEND_TYPES = {
     "anthropic",
     "gemini",
     "openai_compatible",
+}
+
+DEFAULT_API_BACKENDS: dict[str, dict[str, Any]] = {
+    "openai": {
+        "enabled": False,
+        "api_key_env": "OPENAI_API_KEY",
+        "base_url": "https://api.openai.com/v1",
+        "model": "gpt-4o-mini",
+    },
+    "anthropic": {
+        "enabled": False,
+        "api_key_env": "ANTHROPIC_API_KEY",
+        "model": "claude-sonnet-4-20250514",
+    },
+    "gemini": {
+        "enabled": False,
+        "api_key_env": "GEMINI_API_KEY",
+        "model": "gemini-2.0-flash",
+    },
+    "ollama": {
+        "enabled": False,
+        "base_url": "http://localhost:11434",
+        "model": "",
+    },
+    "vllm": {
+        "enabled": False,
+        "base_url": "http://localhost:8000",
+        "model": "",
+    },
+    "openai_compatible": {
+        "enabled": False,
+        "base_url": "",
+        "api_key_env": "",
+        "model": "",
+    },
 }
 
 
@@ -67,6 +102,10 @@ class ModelConfig:
     ollama_model: str = ""
     vllm_model: str = ""
     compatible_model: str = ""
+    compatible_base_url: str = ""
+    api_backends: dict[str, dict[str, Any]] = field(default_factory=lambda: {
+        k: dict(v) for k, v in DEFAULT_API_BACKENDS.items()
+    })
 
     def to_dict(self) -> dict:
         return {
@@ -85,6 +124,8 @@ class ModelConfig:
             "ollama_model": self.ollama_model,
             "vllm_model": self.vllm_model,
             "compatible_model": self.compatible_model,
+            "compatible_base_url": self.compatible_base_url,
+            "api_backends": self.api_backends,
         }
 
     @classmethod
@@ -98,6 +139,12 @@ class ModelConfig:
             max_new_tokens=gen_data.get("max_new_tokens", 512),
             seed=gen_data.get("seed", -1),
         )
+        api_backends = {
+            k: dict(v) for k, v in DEFAULT_API_BACKENDS.items()
+        }
+        for name, cfg in (data.get("api_backends") or {}).items():
+            api_backends[name] = {**api_backends.get(name, {}), **cfg}
+
         return cls(
             model_file=data.get("model_file", ""),
             backend_type=data.get("backend_type", "llama-cpp"),
@@ -114,7 +161,25 @@ class ModelConfig:
             ollama_model=data.get("ollama_model", ""),
             vllm_model=data.get("vllm_model", ""),
             compatible_model=data.get("compatible_model", ""),
+            compatible_base_url=data.get("compatible_base_url", ""),
+            api_backends=api_backends,
         )
+
+    def is_ready(self) -> bool:
+        """Whether setup is complete enough to leave the wizard."""
+        bt = self.backend_type
+        if bt == "llama-cpp":
+            return bool(self.model_file)
+        if bt == "ollama":
+            return bool(self.ollama_model or self.model_file)
+        if bt == "vllm":
+            return bool(self.vllm_model or self.model_file)
+        if bt == "openai_compatible":
+            base = self.compatible_base_url or (self.api_backends.get("openai_compatible") or {}).get("base_url")
+            return bool(base)
+        if bt in ("openai", "anthropic", "gemini"):
+            return True
+        return bool(self.model_file)
 
 
 @dataclass
