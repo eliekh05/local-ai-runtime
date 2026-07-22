@@ -1,0 +1,21 @@
+{
+  "_comment": "Copy this file to server.config.json and edit as needed. Never commit server.config.json.",
+  "_status": "TEMPLATE ONLY — Not parsed by any code yet. See TODO.md Phase 1.1.",
+
+  "host": "127.0.0.1",
+  "port": 8000,
+  "debug": true,
+  "log_level": "info",
+
+  "cors": {
+    "allowed_origins": [
+      "http://localhost:3000"
+    ],
+    "_comment": "Only allow localhost. Do not expose this server to the internet."
+  },
+
+  "timeouts": {
+    "inference_timeout_seconds": 120,
+    "_comment": "How long to wait for a model response before timing out."
+  }
+}

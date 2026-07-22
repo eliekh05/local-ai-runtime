@@ -1,0 +1,98 @@
+# local-ai-runtime — .gitignore
+
+# ---------------------------------------------------------------------------
+# MODEL FILES — Never commit these. They are large binary files.
+# ---------------------------------------------------------------------------
+models/*.gguf
+models/*.bin
+models/*.safetensors
+models/*.pt
+models/*.pth
+
+# Keep the directory itself tracked
+!models/.gitkeep
+
+# ---------------------------------------------------------------------------
+# ACTIVE CONFIG FILES — Machine-specific, may contain local paths
+# ---------------------------------------------------------------------------
+config/server.config.json
+config/model.config.json
+config/model_registry.json
+config/cache_manifest.json
+config/test_log.json
+
+# Keep example templates
+!config/*.example.json
+!config/README.md
+
+# ---------------------------------------------------------------------------
+# PYTHON
+# ---------------------------------------------------------------------------
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+*.egg
+*.egg-info/
+dist/
+build/
+.eggs/
+*.whl
+.venv/
+venv/
+env/
+ENV/
+.env
+
+# Type checking
+.mypy_cache/
+.pyright/
+.ruff_cache/
+
+# ---------------------------------------------------------------------------
+# NODE / FRONTEND
+# ---------------------------------------------------------------------------
+node_modules/
+.npm/
+.pnpm-store/
+dist/
+build/
+.cache/
+*.tsbuildinfo
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# ---------------------------------------------------------------------------
+# EDITOR AND IDE
+# ---------------------------------------------------------------------------
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# ---------------------------------------------------------------------------
+# LOGS
+# ---------------------------------------------------------------------------
+*.log
+logs/
+
+# ---------------------------------------------------------------------------
+# LLAMA.CPP (if vendored as submodule)
+# ---------------------------------------------------------------------------
+# llama.cpp/build/
+# Uncomment if llama.cpp is added as a submodule
+
+# ---------------------------------------------------------------------------
+# SECURITY — Ensure these never get committed
+# ---------------------------------------------------------------------------
+*.key
+*.pem
+*.env
+secrets/

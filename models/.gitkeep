@@ -1,0 +1,4 @@
+# This file ensures the models/ directory is tracked by git even when empty.
+# Place your .gguf model files in this directory.
+# Model files are gitignored and will never be committed.
+# See README.md Section 7 for guidance on obtaining GGUF models.

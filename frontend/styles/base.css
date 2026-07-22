@@ -1,0 +1,96 @@
+/* local-ai-runtime - Dark theme chat UI */
+:root {
+  --color-bg: #0d1117;
+  --color-surface: #161b22;
+  --color-border: #30363d;
+  --color-text: #e6edf3;
+  --color-text-muted: #8b949e;
+  --color-user-bubble: #1f3a5f;
+  --color-ai-bubble: #1a2e1a;
+  --color-accent: #58a6ff;
+  --color-error: #f85149;
+  --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+  --font-mono: "SF Mono", "Fira Code", "Fira Mono", Menlo, Consolas, monospace;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { height: 100%; font-size: 16px; line-height: 1.5; font-family: var(--font-sans); background: var(--color-bg); color: var(--color-text); }
+
+.chat-page { display: flex; flex-direction: column; height: 100vh; }
+
+.app-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 0.75rem 1rem; border-bottom: 1px solid var(--color-border);
+  background: var(--color-surface);
+}
+.app-title { font-weight: 600; font-size: 1rem; color: var(--color-text); }
+
+.chat-window { flex: 1; overflow-y: auto; padding: 1rem; display: flex; flex-direction: column; gap: 0.75rem; }
+.chat-window--empty { display: flex; align-items: center; justify-content: center; }
+
+.message {
+  padding: 0.75rem 1rem; border-radius: 8px; max-width: 80%;
+  word-wrap: break-word;
+}
+.message--user { background: var(--color-user-bubble); margin-left: auto; }
+.message--assistant { background: var(--color-ai-bubble); margin-right: auto; }
+.message__role { display: block; font-size: 0.75rem; color: var(--color-text-muted); text-transform: uppercase; margin-bottom: 0.25rem; }
+.message__content p { margin: 0; }
+.message__content pre { background: #0d1117; padding: 0.75rem; border-radius: 4px; overflow-x: auto; font-family: var(--font-mono); font-size: 0.875rem; margin: 0.5rem 0; }
+.message__content code { font-family: var(--font-mono); font-size: 0.875rem; }
+.message__content :not(pre) > code { background: rgba(110,118,129,0.2); padding: 0.15rem 0.3rem; border-radius: 3px; }
+.message__timestamp { display: block; font-size: 0.7rem; color: var(--color-text-muted); margin-top: 0.25rem; }
+.message__meta { display: block; font-size: 0.7rem; color: var(--color-text-muted); }
+
+.input-bar {
+  display: flex; gap: 0.5rem; padding: 0.75rem 1rem;
+  border-top: 1px solid var(--color-border); background: var(--color-surface);
+}
+.input-bar__field {
+  flex: 1; resize: none; padding: 0.5rem; border-radius: 6px;
+  border: 1px solid var(--color-border); font-family: var(--font-sans);
+  font-size: 1rem; background: var(--color-bg); color: var(--color-text);
+}
+.input-bar__field:focus { outline: none; border-color: var(--color-accent); }
+.input-bar__send {
+  padding: 0.5rem 1.25rem; border-radius: 6px; border: none;
+  background: var(--color-accent); color: #fff; cursor: pointer;
+  font-weight: 500; font-size: 0.9rem;
+}
+.input-bar__send:hover { opacity: 0.9; }
+.input-bar__send:disabled { cursor: not-allowed; opacity: 0.4; }
+
+.loading-indicator { letter-spacing: 0.2em; color: var(--color-text-muted); }
+
+.status-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+.status-ok { background: #3fb950; }
+.status-unreachable { background: var(--color-error); }
+.status-unknown { background: var(--color-text-muted); }
+
+.model-selector {
+  font-size: 0.8rem; padding: 0.25rem 0.5rem; border-radius: 4px;
+  background: var(--color-bg); color: var(--color-text);
+  border: 1px solid var(--color-border);
+}
+
+.empty-state { color: var(--color-text-muted); font-style: italic; text-align: center; }
+
+.error-banner {
+  background: rgba(248,81,73,0.15); border: 1px solid var(--color-error);
+  border-radius: 6px; padding: 0.5rem 1rem; display: flex;
+  align-items: center; gap: 0.75rem; color: var(--color-error);
+}
+.error-retry {
+  background: var(--color-error); color: #fff; border: none;
+  padding: 0.25rem 0.75rem; border-radius: 4px; cursor: pointer;
+}
+
+@media (max-width: 640px) {
+  .message { max-width: 95%; }
+  .app-header { padding: 0.5rem 0.75rem; }
+  .input-bar { padding: 0.5rem 0.75rem; }
+}

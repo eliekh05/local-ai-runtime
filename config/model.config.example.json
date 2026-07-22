@@ -1,0 +1,30 @@
+{
+  "_comment": "Copy this file to model.config.json and edit to match your model. Never commit model.config.json.",
+  "_status": "TEMPLATE ONLY — Not parsed by any code yet. See TODO.md Phase 1.4.",
+
+  "profile_name": "my-first-model",
+  "active_model": "your-model-name-here.gguf",
+  "models_dir": "./models/",
+
+  "chat_template": "chatml",
+  "_chat_template_options": ["chatml", "llama3", "llama2", "mistral", "alpaca", "raw"],
+  "_chat_template_note": "Check the model card on HuggingFace to determine which template to use.",
+
+  "context_length": 4096,
+  "_context_length_note": "Must not exceed the model's maximum context. Common values: 4096, 8192, 32768, 131072.",
+
+  "n_gpu_layers": 0,
+  "_n_gpu_layers_note": "Number of transformer layers to offload to GPU. 0 = CPU only. -1 = all layers.",
+
+  "system_prompt": "You are a helpful assistant.",
+
+  "generation": {
+    "temperature": 0.7,
+    "top_p": 0.9,
+    "top_k": 40,
+    "repeat_penalty": 1.1,
+    "max_new_tokens": 512,
+    "seed": -1,
+    "_seed_note": "-1 means random seed. Set a fixed integer for reproducible outputs."
+  }
+}
