@@ -69,12 +69,16 @@ async function loadProviders(){
 }
 
 async function checkSetup(){
+  const forceSetup=new URLSearchParams(location.search).has("setup");
+  if(forceSetup){needsSetup=true;return}
   try{
     const r=await fetch(`${API}/config/`);
     if(!r.ok){needsSetup=true;return}
     const c=await r.json();
     activeConfig=c;
-    needsSetup=c.ready!==true;
+    // Show wizard until the user completes Start (onboarding_done)
+    needsSetup=c.show_onboarding===true||c.onboarding_done===false||(c.ready!==true&&c.show_onboarding!==false);
+    if(c.onboarding_done===true&&c.ready===true)needsSetup=false;
   }catch{needsSetup=true}
 }
 
@@ -171,7 +175,7 @@ function renderSetup(){
     }
 
     // Ensure llama-cpp / explicit model_file persisted via PUT when needed
-    const putBody={provider_id:selected.id,backend_type:selected.backend};
+    const putBody={provider_id:selected.id,backend_type:selected.backend,onboarding_done:true};
     if(model)putBody.model_file=model;
     if(selected.backend==="openai_compatible"&&url)putBody.compatible_base_url=url;
     if(selected.backend==="openai_compatible"&&model)putBody.compatible_model=model;
@@ -210,7 +214,10 @@ function renderChat(){
   fetch(`${API}/config/`).then(r=>r.json()).then(c=>{
     activeConfig=c;
     const label=$("span",{style:"font-size:.75rem;color:var(--muted)"},`${c.provider_id||c.backend_type||"?"}${c.model_file?" · "+c.model_file:""}`);
-    const change=$("button",{class:"linkish",on:{click:()=>{needsSetup=true;render()}}},"change provider");
+    const change=$("button",{class:"linkish",on:{click:async()=>{
+      await fetch(`${API}/config/`,{method:"PUT",headers:{"Content-Type":"application/json"},body:JSON.stringify({onboarding_done:false})});
+      needsSetup=true;history.replaceState({},"","/?setup=1");render();
+    }}},"change provider");
     const controls=document.getElementById("controls");
     controls.appendChild(label);
     controls.appendChild(change);

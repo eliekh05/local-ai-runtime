@@ -15,6 +15,7 @@ router = APIRouter()
 class ConfigUpdate(BaseModel):
     backend_type: str | None = None
     provider_id: str | None = None
+    onboarding_done: bool | None = None
     model_file: str | None = None
     chat_template: str | None = None
     context_length: int | None = None
@@ -38,6 +39,7 @@ async def get_config():
         raise HTTPException(status_code=404, detail="No active model configuration.")
     data = config.to_dict()
     data["ready"] = config.is_ready()
+    data["show_onboarding"] = config.show_onboarding()
     return data
 
 
@@ -49,6 +51,8 @@ async def update_config(update: ConfigUpdate):
 
     if update.provider_id is not None:
         config.provider_id = update.provider_id
+    if update.onboarding_done is not None:
+        config.onboarding_done = update.onboarding_done
     if update.backend_type is not None:
         config.backend_type = update.backend_type
     if update.model_file is not None:
@@ -120,6 +124,7 @@ async def update_config(update: ConfigUpdate):
     set_active_config(config)
     data = config.to_dict()
     data["ready"] = config.is_ready()
+    data["show_onboarding"] = config.show_onboarding()
     return {"message": "Config updated", "config": data}
 
 
@@ -206,4 +211,5 @@ async def set_api_key(body: APIKeySet):
         "provider_id": provider_id,
         "backend_type": config.backend_type,
         "ready": config.is_ready(),
+        "show_onboarding": config.show_onboarding(),
     }

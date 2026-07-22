@@ -89,6 +89,7 @@ class ModelConfig:
     model_file: str = ""
     backend_type: str = "llama-cpp"
     provider_id: str = ""
+    onboarding_done: bool = False
     chat_template: str = "auto"
     context_length: int = 4096
     system_prompt: str = "You are a helpful assistant."
@@ -113,6 +114,7 @@ class ModelConfig:
             "profile_name": self.profile_name,
             "backend_type": self.backend_type,
             "provider_id": self.provider_id,
+            "onboarding_done": self.onboarding_done,
             "model_file": self.model_file,
             "chat_template": self.chat_template,
             "context_length": self.context_length,
@@ -147,10 +149,17 @@ class ModelConfig:
         for name, cfg in (data.get("api_backends") or {}).items():
             api_backends[name] = {**api_backends.get(name, {}), **cfg}
 
+        # Legacy configs without onboarding_done: treat as not done so wizard shows
+        # unless they already have a usable backend (then keep chat usable via ready).
+        onboarding_done = data.get("onboarding_done")
+        if onboarding_done is None:
+            onboarding_done = False
+
         return cls(
             model_file=data.get("model_file", ""),
             backend_type=data.get("backend_type", "llama-cpp"),
             provider_id=data.get("provider_id", ""),
+            onboarding_done=bool(onboarding_done),
             chat_template=data.get("chat_template", "auto"),
             context_length=data.get("context_length", 4096),
             system_prompt=data.get("system_prompt", "You are a helpful assistant."),
@@ -169,7 +178,7 @@ class ModelConfig:
         )
 
     def is_ready(self) -> bool:
-        """Whether setup is complete enough to leave the wizard."""
+        """Whether inference can run (backend configured)."""
         bt = self.backend_type
         if bt == "llama-cpp":
             return bool(self.model_file)
@@ -183,6 +192,11 @@ class ModelConfig:
         if bt in ("openai", "anthropic", "gemini"):
             return True
         return bool(self.model_file or self.provider_id)
+
+    def show_onboarding(self) -> bool:
+        """Wizard shows until the user completes Start once."""
+        return not self.onboarding_done
+
 
 
 @dataclass
