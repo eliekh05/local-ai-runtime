@@ -22,8 +22,7 @@ class GeminiBackend(Backend):
         return "gemini"
 
     def is_available(self) -> bool:
-        api_key_env = self._config.get("api_key_env", "GEMINI_API_KEY")
-        return bool(os.environ.get(api_key_env))
+        return True  # API backend — always available, needs key at call time
 
     def load_model(self, model_config: dict) -> None:
         if not self.is_available():

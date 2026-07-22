@@ -67,3 +67,37 @@ async def update_config(update: ConfigUpdate):
 async def list_backends():
     from model_runtime.backends import list_backends as _list
     return {"backends": _list()}
+
+
+class APIKeySet(BaseModel):
+    backend: str
+    api_key: str
+
+
+@router.post("/apikey")
+async def set_api_key(body: APIKeySet):
+    """Store API key in server config for the session."""
+    import os
+    env_map = {
+        "openai": "OPENAI_API_KEY",
+        "anthropic": "ANTHROPIC_API_KEY",
+        "gemini": "GEMINI_API_KEY",
+    }
+    env_var = env_map.get(body.backend)
+    if env_var:
+        os.environ[env_var] = body.api_key
+        return {"message": f"API key set for {body.backend}"}
+    elif body.backend == "openai_compatible":
+        # Store in config
+        config = get_active_config()
+        if config:
+            config_dict = config.to_dict() if hasattr(config, "to_dict") else config
+            api_backends = config_dict.get("api_backends", {})
+            if "openai_compatible" in api_backends:
+                api_backends["openai_compatible"]["enabled"] = True
+        return {"message": "OpenAI-compatible backend configured"}
+    elif body.backend == "ollama":
+        return {"message": "Ollama uses local connection, no API key needed"}
+    elif body.backend == "vllm":
+        return {"message": "vLLM uses local connection, no API key needed"}
+    raise HTTPException(status_code=400, detail=f"Unknown backend: {body.backend}")

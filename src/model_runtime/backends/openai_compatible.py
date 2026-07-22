@@ -23,8 +23,7 @@ class OpenAICompatibleBackend(Backend):
         return "openai_compatible"
 
     def is_available(self) -> bool:
-        base_url = self._config.get("base_url", "")
-        return bool(base_url)
+        return True  # Always available — user provides base_url at config time
 
     def load_model(self, model_config: dict) -> None:
         base_url = self._config.get("base_url", "")

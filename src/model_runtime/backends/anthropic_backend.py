@@ -22,8 +22,11 @@ class AnthropicBackend(Backend):
         return "anthropic"
 
     def is_available(self) -> bool:
-        api_key_env = self._config.get("api_key_env", "ANTHROPIC_API_KEY")
-        return bool(os.environ.get(api_key_env))
+        try:
+            import anthropic  # noqa: F401
+            return True
+        except ImportError:
+            return False
 
     def load_model(self, model_config: dict) -> None:
         if not self.is_available():

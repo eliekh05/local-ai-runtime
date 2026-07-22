@@ -29,19 +29,7 @@ class VLLMBackend(Backend):
         return "vllm"
 
     def is_available(self) -> bool:
-        # Check if vllm is installed or if server is already running
-        try:
-            resp = httpx.get(f"{self._base_url}/v1/models", timeout=5)
-            return resp.status_code == 200
-        except Exception:
-            pass
-
-        # Check if vllm Python package is available
-        try:
-            import vllm
-            return True
-        except ImportError:
-            return False
+        return True  # Always available — connects to running server or spawns one
 
     def load_model(self, model_config: dict) -> None:
         self._model = model_config.get("vllm_model", self._config.get("model", ""))
