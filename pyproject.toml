@@ -1,6 +1,6 @@
 [project]
 name = "local-ai-runtime"
-version = "0.1.0"
+version = "0.1.1"
 description = "Local AI chat runtime — BYOK hybrid inference (local GGUF, ollama, vLLM, OpenAI, Anthropic, Gemini, any OpenAI-compatible)"
 requires-python = ">=3.14"
 dependencies = [
@@ -27,7 +27,7 @@ all = [
 ]
 
 [project.scripts]
-local-ai-runtime = "src.local_ai_runtime.cli:main"
+local-ai-runtime = "local_ai_runtime.cli:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
